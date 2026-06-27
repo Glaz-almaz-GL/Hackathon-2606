@@ -16,6 +16,7 @@ namespace TerrainNavigation.WinForms.Controls
         private Bitmap? _terrainBitmap;
         private CorrelationEngine? _engine;
         private FlightPath? _path;
+        private readonly GraphControl _graphControl;
 
         private double _noiseLevel = 0;
 
@@ -28,7 +29,7 @@ namespace TerrainNavigation.WinForms.Controls
 
         private bool _isDrawing = false;
 
-        public NavigationCanvasControl()
+        public NavigationCanvasControl(GraphControl graphControl)
         {
             DoubleBuffered = true;
 
@@ -38,6 +39,7 @@ namespace TerrainNavigation.WinForms.Controls
                      ControlStyles.ResizeRedraw, true);
 
             BackColor = Color.Black;
+            _graphControl = graphControl;
         }
 
         #region MAP
@@ -74,7 +76,7 @@ namespace TerrainNavigation.WinForms.Controls
                 {
                     float h = _map.Heights[r, c].Height;
 
-                    int gray = (int)Math.Clamp(h /*/ 10f*/, 0, 255);
+                    int gray = (int)Math.Clamp(h / 10f, 0, 255);
 
                     _terrainBitmap.SetPixel(c, r, Color.FromArgb(gray, gray, gray));
                 }
@@ -152,7 +154,8 @@ namespace TerrainNavigation.WinForms.Controls
                 return;
             }
 
-            RunSimulationAndEstimation(_noiseLevel);
+            LoadGraph(GetPoints());
+            //RunSimulationAndEstimation(_noiseLevel);
         }
 
         /// <summary>
@@ -343,7 +346,7 @@ namespace TerrainNavigation.WinForms.Controls
             int width = _map.Columns;
             int height = _map.Rows;
 
-
+            LoadGraph(GetPoints());
 
             double dw = (double)width / this.Width;
             double dh = (double)height / this.Height;
@@ -405,6 +408,50 @@ namespace TerrainNavigation.WinForms.Controls
             LogService.Log("Отрисовано " + _estimatedPoints.Count + " точек");
             Invalidate(); // Перерисовываем контрол
         }
+
+        #region Private Methods
+        private void LoadGraph(IEnumerable<TerrainPoint> points)
+        {
+            _graphControl.SetPoints([.. points]);
+        }
+
+        private List<TerrainPoint> GetPoints()
+        {
+            if (_map is null)
+            {
+                return [];
+            }
+
+            List<TerrainPoint> terrainPoints = [];
+
+            var path = new FlightPath();
+
+            int width = _map.Columns;
+            int height = _map.Rows;
+
+            double dw = (double)width / this.Width;
+            double dh = (double)height / this.Height;
+
+            foreach (PointF p in _drawPoints)
+            {
+                path.Points.Add((p.X * dw, p.Y * dh));
+            }
+
+            foreach ((double X, double Y) in path.Points)
+            {
+                var column = _map.GetColFromMeters(X);
+                var row = _map.GetRowFromMeters(Y);
+
+                if (_map.IsInside(row, column))
+                {
+                    var pointHeight = _map.Heights[row, column].Height;
+                    terrainPoints.Add(new() { Height = pointHeight, Latitude = _map.GetLatitude(row), Longitude = _map.GetLongitude(column) });
+                }
+            }
+
+            return terrainPoints;
+        }
+        #endregion
 
         /// <summary>
         /// Генерирует случайный прямой маршрут заданной длины (в метрах).

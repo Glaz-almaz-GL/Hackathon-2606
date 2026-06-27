@@ -1,6 +1,6 @@
-using Microsoft.VisualBasic.Logging;
 using TerrainNavigation.Core.Map;
 using TerrainNavigation.Core.Models;
+using TerrainNavigation.Core.Navigation;
 using TerrainNavigation.Core.Services;
 using TerrainNavigation.WinForms.Controls;
 
@@ -12,7 +12,8 @@ namespace TerrainNavigation.WinForms
         private readonly MapLoader _loader;
         private TerrainMap? _map;
 
-        private NavigationCanvasControl _canvas;
+        private readonly NavigationCanvasControl _canvas;
+        private readonly GraphControl _graphControl;
 
         public MainForm()
         {
@@ -20,14 +21,19 @@ namespace TerrainNavigation.WinForms
 
             _loader = new MapLoader();
 
+            _graphControl = new()
+            {
+                Dock = DockStyle.Fill
+            };
 
-            _canvas = new NavigationCanvasControl
+            _canvas = new NavigationCanvasControl(_graphControl)
             {
                 Dock = DockStyle.Fill
             };
 
             mainPanel.Controls.Clear();
             mainPanel.Controls.Add(_canvas);
+            graphPanel.Controls.Add(_graphControl);
 
             LogService.OnLog += LogService_OnLog;
         }
@@ -69,6 +75,14 @@ namespace TerrainNavigation.WinForms
             }
         }
 
+        private void GenerateTestData()
+        {
+            if (_map is null) return;
+
+            var path = _canvas.GetUserPath();
+            var firstPoint = path[0];
+            var lastPoint = path[^1];
+        }
 
         private void LoadMap(string path)
         {
@@ -102,6 +116,11 @@ namespace TerrainNavigation.WinForms
         {
             _canvas.GeneratePath(pathSlider.Value);
             LogService.Log("Начинаем генерацию пути протяженностью " + pathSlider.Value + " метров");
+        }
+
+        private void btTestData_Click(object sender, EventArgs e)
+        {
+            GenerateTestData();
         }
     }
 }

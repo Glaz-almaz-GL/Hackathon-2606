@@ -114,7 +114,7 @@ namespace TerrainNavigation.Core.Models
         /// </summary>
         public TerrainMap(
             TerrainPoint[,] heights,
-            
+
             double minLongitude,
             double maxLongitude,
             double minLatitude,
@@ -125,7 +125,7 @@ namespace TerrainNavigation.Core.Models
             double cellSizeY)
         {
             Heights = heights;
-            
+
 
             MinLongitude = minLongitude;
             MaxLongitude = maxLongitude;
@@ -152,7 +152,7 @@ namespace TerrainNavigation.Core.Models
         /// </summary>
         public int GetRow(double latitude)
         {
-            return (int)((latitude - MinLatitude) / LatitudeStep);
+            return (int)Math.Round((latitude - MinLatitude) / LatitudeStep);
         }
 
         /// <summary>
@@ -160,7 +160,7 @@ namespace TerrainNavigation.Core.Models
         /// </summary>
         public int GetColumn(double longitude)
         {
-            return (int)((longitude - MinLongitude) / LongitudeStep);
+            return (int)Math.Round((longitude - MinLongitude) / LongitudeStep);
         }
 
         /// <summary>

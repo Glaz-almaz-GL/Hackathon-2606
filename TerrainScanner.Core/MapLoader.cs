@@ -1,118 +1,11 @@
 ﻿using OSGeo.GDAL;
-using System.Globalization;
-using TerrainNavigation.Core.Models;
+using System.Runtime.Intrinsics.X86;
+using TerrainScanner.Core.Models;
 
-namespace TerrainNavigation.Core.Map
+namespace TerrainScanner.Core
 {
-    /// <summary>
-    /// Загрузчик цифровой модели рельефа.
-    /// Формирует TerrainMap (карта рельефа) и вычисляет все производные.
-    /// </summary>
-    public sealed class MapLoader
+    public class MapLoader
     {
-        /// <summary>
-        /// Загружает карту из CSV файла формата: Lat;Lon;Height
-        /// </summary>
-        public TerrainMap LoadFromCsv(string filePath)
-        {
-            if (!File.Exists(filePath))
-            {
-                throw new FileNotFoundException("Файл карты не найден", filePath);
-            }
-
-            string[] lines = File.ReadAllLines(filePath);
-
-            if (lines.Length < 2)
-            {
-                throw new InvalidDataException("Файл карты пуст или повреждён");
-            }
-
-            int startIndex = 0;
-
-            // Проверка заголовка
-            if (lines[0].Contains("Lat") && lines[0].Contains("Lon") && lines[0].Contains("Height"))
-            {
-                startIndex = 1;
-            }
-
-            List<TerrainPoint> terrainPoints = new(lines.Length - startIndex);
-
-            // -----------------------------
-            // 1. Чтение данных
-            // -----------------------------
-            for (int i = startIndex; i < lines.Length; i++)
-            {
-                if (string.IsNullOrWhiteSpace(lines[i])) continue;
-
-                string[] parts = lines[i].Split(';', ',');
-
-                if (parts.Length < 3) continue;
-
-                try
-                {
-                    double lat = double.Parse(parts[0], CultureInfo.InvariantCulture);
-                    double lon = double.Parse(parts[1], CultureInfo.InvariantCulture);
-                    float height = float.Parse(parts[2], CultureInfo.InvariantCulture);
-
-                    terrainPoints.Add(new TerrainPoint
-                    {
-                        Latitude = lat,
-                        Longitude = lon,
-                        Height = height
-                    });
-                }
-                catch (FormatException)
-                {
-                    continue;
-                }
-            }
-
-            if (terrainPoints.Count < 9)
-            {
-                throw new InvalidDataException("Недостаточно точек для построения карты");
-            }
-
-            // -----------------------------
-            // 2. Определение размеров сетки
-            // -----------------------------
-            int pointInLineCount = 1;
-            double firstLat = terrainPoints[0].Latitude;
-
-            for (int i = 1; i < terrainPoints.Count; i++)
-            {
-                if (terrainPoints[i].Latitude != firstLat)
-                {
-                    pointInLineCount = i;
-                    break;
-                }
-            }
-
-            int xSize = pointInLineCount;
-            int ySize = terrainPoints.Count / pointInLineCount;
-
-            // -----------------------------
-            // 3. Заполнение массива сетки
-            // -----------------------------
-            TerrainPoint[,] heights = new TerrainPoint[xSize, ySize];
-
-            for (int row = 0; row < ySize; row++)
-            {
-                for (int col = 0; col < xSize; col++)
-                {
-                    int index = (row * xSize) + col;
-                    if (index < terrainPoints.Count)
-                    {
-                        heights[col, row] = terrainPoints[index];
-                    }
-                }
-            }
-
-            // -----------------------------
-            // 4. Делегирование общей логики
-            // -----------------------------
-            return CreateTerrainMapFromGrid(heights, xSize, ySize);
-        }
-
         /// <summary>
         /// Загружает карту из GeoTIFF файла.
         /// </summary>
@@ -159,7 +52,6 @@ namespace TerrainNavigation.Core.Map
                     // Пропускаем NoData
                     if (hasNoData == 1 && Math.Abs(z - noDataValue) < 0.001)
                     {
-                        heights[col, row] = new TerrainPoint { Height = 0, Latitude = 0, Longitude = 0 };
                         continue;
                     }
 
@@ -213,13 +105,6 @@ namespace TerrainNavigation.Core.Map
                 {
                     var p = heights[col, row];
 
-                    // Пропускаем пустые/невалидные точки (помеченные нулями в TIF или отсутствующие в CSV)
-                    // Примечание: Если высота 0 является валидной, нужна более сложная проверка (например, флаг IsEmpty)
-                    if (p.Latitude == 0 && p.Longitude == 0 && p.Height == 0)
-                    {
-                        continue;
-                    }
-
                     if (p.Latitude < minX) minX = p.Latitude;
                     if (p.Latitude > maxX) maxX = p.Latitude;
                     if (p.Longitude < minY) minY = p.Longitude;
@@ -238,9 +123,6 @@ namespace TerrainNavigation.Core.Map
             {
                 throw new InvalidDataException("Нет валидных данных для построения карты");
             }
-
-            float avg = (float)(sum / validCount);
-            float std = (float)Math.Sqrt((sumSq / validCount) - (avg * avg));
 
             // Вычисляем шаг сетки
             double xStep = 0;
@@ -272,22 +154,18 @@ namespace TerrainNavigation.Core.Map
                 }
             }
 
-            return new TerrainMap(
+            return new TerrainMap(new MapOptions(
                 heights,
-               minLongitude: minX,
-               maxLongitude: maxX,
-               minLatitude: minY,
-               maxLatitude: maxY,
-               longitudeStep: xStep,
-              latitudeStep: yStep,
-               cellSizeX: xStep * 111320.0,
-               cellSizeY: yStep * 111320.0)
-            {
-                MinHeight = minH,
-                MaxHeight = maxH,
-                AverageHeight = avg,
-                HeightStdDev = std
-            };
+                MinLongitude: minX,
+                MaxLongitude: maxX,
+                MinLatitude: minY,
+                MaxLatitude: maxY,
+                LongitudeStep: xStep,
+                LatitudeStep: yStep,
+                MinHeight: minH,
+                MaxHeight: maxH,
+                CellSizeX: xStep * 111320.0,
+                CellSizeY: yStep * 111320.0));
         }
     }
 }

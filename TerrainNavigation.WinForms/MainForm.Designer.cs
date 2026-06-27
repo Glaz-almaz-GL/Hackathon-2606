@@ -39,9 +39,16 @@
             btnRun = new Button();
             mainPanel = new Panel();
             txtLog = new TextBox();
+            splitContainer1 = new SplitContainer();
+            graphPanel = new Panel();
+            btTestData = new Button();
             panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)pathSlider).BeginInit();
             ((System.ComponentModel.ISupportInitialize)_noiseSlider).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
+            splitContainer1.Panel1.SuspendLayout();
+            splitContainer1.Panel2.SuspendLayout();
+            splitContainer1.SuspendLayout();
             SuspendLayout();
             // 
             // btMapLoad
@@ -67,7 +74,7 @@
             panel1.Dock = DockStyle.Top;
             panel1.Location = new Point(0, 0);
             panel1.Name = "panel1";
-            panel1.Size = new Size(1185, 49);
+            panel1.Size = new Size(1237, 49);
             panel1.TabIndex = 2;
             // 
             // label1
@@ -137,27 +144,63 @@
             // 
             // mainPanel
             // 
-            mainPanel.Dock = DockStyle.Left;
-            mainPanel.Location = new Point(0, 49);
+            mainPanel.Dock = DockStyle.Fill;
+            mainPanel.Location = new Point(0, 0);
             mainPanel.Name = "mainPanel";
-            mainPanel.Size = new Size(934, 693);
+            mainPanel.Size = new Size(637, 278);
             mainPanel.TabIndex = 3;
             // 
             // txtLog
             // 
-            txtLog.Location = new Point(940, 55);
+            txtLog.Location = new Point(655, 51);
             txtLog.Multiline = true;
             txtLog.Name = "txtLog";
             txtLog.Size = new Size(233, 495);
             txtLog.TabIndex = 4;
             // 
+            // splitContainer1
+            // 
+            splitContainer1.Location = new Point(12, 55);
+            splitContainer1.Name = "splitContainer1";
+            splitContainer1.Orientation = Orientation.Horizontal;
+            // 
+            // splitContainer1.Panel1
+            // 
+            splitContainer1.Panel1.Controls.Add(mainPanel);
+            // 
+            // splitContainer1.Panel2
+            // 
+            splitContainer1.Panel2.Controls.Add(graphPanel);
+            splitContainer1.Size = new Size(637, 491);
+            splitContainer1.SplitterDistance = 278;
+            splitContainer1.TabIndex = 5;
+            // 
+            // graphPanel
+            // 
+            graphPanel.Dock = DockStyle.Fill;
+            graphPanel.Location = new Point(0, 0);
+            graphPanel.Name = "graphPanel";
+            graphPanel.Size = new Size(637, 209);
+            graphPanel.TabIndex = 0;
+            // 
+            // btTestData
+            // 
+            btTestData.Location = new Point(894, 55);
+            btTestData.Name = "btTestData";
+            btTestData.Size = new Size(112, 42);
+            btTestData.TabIndex = 8;
+            btTestData.Text = "Тестовые данные";
+            btTestData.UseVisualStyleBackColor = true;
+            btTestData.Click += btTestData_Click;
+            // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1185, 742);
+            ClientSize = new Size(1237, 606);
+            Controls.Add(btTestData);
+            Controls.Add(splitContainer1);
             Controls.Add(txtLog);
-            Controls.Add(mainPanel);
             Controls.Add(panel1);
             Name = "MainForm";
             Text = "Навигация по рельефу. Хакатон 26.06";
@@ -165,6 +208,10 @@
             panel1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)pathSlider).EndInit();
             ((System.ComponentModel.ISupportInitialize)_noiseSlider).EndInit();
+            splitContainer1.Panel1.ResumeLayout(false);
+            splitContainer1.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)splitContainer1).EndInit();
+            splitContainer1.ResumeLayout(false);
             ResumeLayout(false);
             PerformLayout();
         }
@@ -182,5 +229,8 @@
         private Label label1;
         private TrackBar pathSlider;
         private Button btGeneration;
+        private SplitContainer splitContainer1;
+        private Panel graphPanel;
+        private Button btTestData;
     }
 }

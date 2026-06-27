@@ -2,4 +2,6 @@
   <Project Path="Hackathon/Hackathon.csproj" />
   <Project Path="TerrainNavigation.Core/TerrainNavigation.Core.csproj" Id="37b54ff7-1f0e-4628-b0d4-f582bdd52ebc" />
   <Project Path="TerrainNavigation.WinForms/TerrainNavigation.WinForms.csproj" Id="6a30ca57-22e4-4452-b58b-aa88933969e3" />
+  <Project Path="TerrainScanner.Core/TerrainScanner.Core.csproj" Id="e79c2927-79e6-4171-a376-811bd4aa8396" />
+  <Project Path="TerrainScanner.WinForms/TerrainScanner.WinForms.csproj" Id="41d186ee-bad9-4b56-8c0f-65e844ca6af1" />
 </Solution>
