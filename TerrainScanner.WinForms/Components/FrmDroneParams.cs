@@ -10,12 +10,12 @@ using TerrainScanner.Core.Services;
 
 namespace TerrainScanner.WinForms.Components
 {
-    public partial class FrmDrone : Form
+    public partial class FrmDroneParams : Form
     {
         /// <summary>
         /// Конструктор. Принимает размеры карты и географические границы для корректной валидации.
         /// </summary>
-        public FrmDrone(int mapRows, int mapColumns, double minLat, double maxLat, double minLon, double maxLon)
+        public FrmDroneParams(int mapRows, int mapColumns, double minLat, double maxLat, double minLon, double maxLon)
         {
             InitializeComponent();
             AcceptButton = BtnOk;

@@ -1,4 +1,5 @@
-﻿using TerrainScanner.Core.Models;
+﻿using System.Runtime.CompilerServices;
+using TerrainScanner.Core.Models;
 using TerrainScanner.Core.Models.Models;
 using TerrainScanner.Core.Models.Terrain;
 using TerrainScanner.Core.Services;

@@ -53,6 +53,10 @@
             CellY = new Label();
             panel2 = new Panel();
             splitContainer2 = new SplitContainer();
+            LblZ = new Label();
+            LblY = new Label();
+            LblX = new Label();
+            label11 = new Label();
             label9 = new Label();
             TxtLog = new RichTextBox();
             splitContainer1 = new SplitContainer();
@@ -73,7 +77,7 @@
             PnlTerrain.Dock = DockStyle.Fill;
             PnlTerrain.Location = new Point(0, 0);
             PnlTerrain.Name = "PnlTerrain";
-            PnlTerrain.Size = new Size(622, 276);
+            PnlTerrain.Size = new Size(622, 328);
             PnlTerrain.TabIndex = 0;
             // 
             // BtSelectMap
@@ -91,7 +95,7 @@
             PnlGraph.Dock = DockStyle.Fill;
             PnlGraph.Location = new Point(0, 0);
             PnlGraph.Name = "PnlGraph";
-            PnlGraph.Size = new Size(622, 282);
+            PnlGraph.Size = new Size(622, 339);
             PnlGraph.TabIndex = 0;
             // 
             // panel1
@@ -140,7 +144,7 @@
             // label1
             // 
             label1.AutoSize = true;
-            label1.Location = new Point(5, 3);
+            label1.Location = new Point(8, 3);
             label1.Name = "label1";
             label1.Size = new Size(206, 15);
             label1.TabIndex = 5;
@@ -149,7 +153,7 @@
             // label2
             // 
             label2.AutoSize = true;
-            label2.Location = new Point(2, 46);
+            label2.Location = new Point(8, 43);
             label2.Name = "label2";
             label2.Size = new Size(269, 15);
             label2.TabIndex = 6;
@@ -158,7 +162,7 @@
             // label3
             // 
             label3.AutoSize = true;
-            label3.Location = new Point(2, 88);
+            label3.Location = new Point(8, 83);
             label3.Name = "label3";
             label3.Size = new Size(169, 15);
             label3.TabIndex = 7;
@@ -167,7 +171,7 @@
             // label4
             // 
             label4.AutoSize = true;
-            label4.Location = new Point(2, 132);
+            label4.Location = new Point(8, 123);
             label4.Name = "label4";
             label4.Size = new Size(170, 15);
             label4.TabIndex = 8;
@@ -176,7 +180,7 @@
             // label5
             // 
             label5.AutoSize = true;
-            label5.Location = new Point(4, 180);
+            label5.Location = new Point(8, 163);
             label5.Name = "label5";
             label5.Size = new Size(167, 15);
             label5.TabIndex = 9;
@@ -185,7 +189,7 @@
             // PearsonCorrelation
             // 
             PearsonCorrelation.AutoSize = true;
-            PearsonCorrelation.Location = new Point(7, 18);
+            PearsonCorrelation.Location = new Point(8, 23);
             PearsonCorrelation.Name = "PearsonCorrelation";
             PearsonCorrelation.Size = new Size(0, 15);
             PearsonCorrelation.TabIndex = 10;
@@ -193,7 +197,7 @@
             // SpearmanCorrelation
             // 
             SpearmanCorrelation.AutoSize = true;
-            SpearmanCorrelation.Location = new Point(5, 61);
+            SpearmanCorrelation.Location = new Point(8, 63);
             SpearmanCorrelation.Name = "SpearmanCorrelation";
             SpearmanCorrelation.Size = new Size(0, 15);
             SpearmanCorrelation.TabIndex = 11;
@@ -201,7 +205,7 @@
             // RMSE
             // 
             RMSE.AutoSize = true;
-            RMSE.Location = new Point(5, 103);
+            RMSE.Location = new Point(8, 103);
             RMSE.Name = "RMSE";
             RMSE.Size = new Size(0, 15);
             RMSE.TabIndex = 12;
@@ -209,7 +213,7 @@
             // MAE
             // 
             MAE.AutoSize = true;
-            MAE.Location = new Point(5, 147);
+            MAE.Location = new Point(8, 143);
             MAE.Name = "MAE";
             MAE.Size = new Size(0, 15);
             MAE.TabIndex = 13;
@@ -217,7 +221,7 @@
             // R2
             // 
             R2.AutoSize = true;
-            R2.Location = new Point(5, 195);
+            R2.Location = new Point(8, 183);
             R2.Name = "R2";
             R2.Size = new Size(0, 15);
             R2.TabIndex = 14;
@@ -225,7 +229,7 @@
             // label6
             // 
             label6.AutoSize = true;
-            label6.Location = new Point(5, 227);
+            label6.Location = new Point(8, 203);
             label6.Name = "label6";
             label6.Size = new Size(221, 15);
             label6.TabIndex = 15;
@@ -234,7 +238,7 @@
             // InterpolatedBlueValues
             // 
             InterpolatedBlueValues.AutoSize = true;
-            InterpolatedBlueValues.Location = new Point(5, 242);
+            InterpolatedBlueValues.Location = new Point(8, 223);
             InterpolatedBlueValues.Name = "InterpolatedBlueValues";
             InterpolatedBlueValues.Size = new Size(0, 15);
             InterpolatedBlueValues.TabIndex = 16;
@@ -242,7 +246,7 @@
             // label7
             // 
             label7.AutoSize = true;
-            label7.Location = new Point(7, 269);
+            label7.Location = new Point(8, 243);
             label7.Name = "label7";
             label7.Size = new Size(92, 15);
             label7.TabIndex = 17;
@@ -251,7 +255,7 @@
             // label8
             // 
             label8.AutoSize = true;
-            label8.Location = new Point(6, 316);
+            label8.Location = new Point(8, 283);
             label8.Name = "label8";
             label8.Size = new Size(87, 15);
             label8.TabIndex = 18;
@@ -260,7 +264,7 @@
             // CellX
             // 
             CellX.AutoSize = true;
-            CellX.Location = new Point(7, 284);
+            CellX.Location = new Point(8, 263);
             CellX.Name = "CellX";
             CellX.Size = new Size(0, 15);
             CellX.TabIndex = 19;
@@ -268,7 +272,7 @@
             // CellY
             // 
             CellY.AutoSize = true;
-            CellY.Location = new Point(7, 331);
+            CellY.Location = new Point(8, 303);
             CellY.Name = "CellY";
             CellY.Size = new Size(0, 15);
             CellY.TabIndex = 20;
@@ -279,7 +283,7 @@
             panel2.Dock = DockStyle.Left;
             panel2.Location = new Point(0, 52);
             panel2.Name = "panel2";
-            panel2.Size = new Size(281, 562);
+            panel2.Size = new Size(281, 671);
             panel2.TabIndex = 21;
             // 
             // splitContainer2
@@ -291,6 +295,10 @@
             // 
             // splitContainer2.Panel1
             // 
+            splitContainer2.Panel1.Controls.Add(LblZ);
+            splitContainer2.Panel1.Controls.Add(LblY);
+            splitContainer2.Panel1.Controls.Add(LblX);
+            splitContainer2.Panel1.Controls.Add(label11);
             splitContainer2.Panel1.Controls.Add(label1);
             splitContainer2.Panel1.Controls.Add(CellY);
             splitContainer2.Panel1.Controls.Add(RMSE);
@@ -312,9 +320,42 @@
             // 
             splitContainer2.Panel2.Controls.Add(label9);
             splitContainer2.Panel2.Controls.Add(TxtLog);
-            splitContainer2.Size = new Size(281, 562);
-            splitContainer2.SplitterDistance = 363;
+            splitContainer2.Size = new Size(281, 671);
+            splitContainer2.SplitterDistance = 399;
             splitContainer2.TabIndex = 23;
+            // 
+            // LblZ
+            // 
+            LblZ.AutoSize = true;
+            LblZ.Location = new Point(8, 383);
+            LblZ.Name = "LblZ";
+            LblZ.Size = new Size(0, 15);
+            LblZ.TabIndex = 24;
+            // 
+            // LblY
+            // 
+            LblY.AutoSize = true;
+            LblY.Location = new Point(8, 363);
+            LblY.Name = "LblY";
+            LblY.Size = new Size(0, 15);
+            LblY.TabIndex = 23;
+            // 
+            // LblX
+            // 
+            LblX.AutoSize = true;
+            LblX.Location = new Point(8, 343);
+            LblX.Name = "LblX";
+            LblX.Size = new Size(0, 15);
+            LblX.TabIndex = 22;
+            // 
+            // label11
+            // 
+            label11.AutoSize = true;
+            label11.Location = new Point(8, 323);
+            label11.Name = "label11";
+            label11.Size = new Size(165, 15);
+            label11.TabIndex = 21;
+            label11.Text = "Координаты X Y Z (Z высота)";
             // 
             // label9
             // 
@@ -332,7 +373,7 @@
             TxtLog.Location = new Point(0, 0);
             TxtLog.Name = "TxtLog";
             TxtLog.ReadOnly = true;
-            TxtLog.Size = new Size(281, 195);
+            TxtLog.Size = new Size(281, 268);
             TxtLog.TabIndex = 21;
             TxtLog.Text = "";
             // 
@@ -350,15 +391,15 @@
             // splitContainer1.Panel2
             // 
             splitContainer1.Panel2.Controls.Add(PnlGraph);
-            splitContainer1.Size = new Size(622, 562);
-            splitContainer1.SplitterDistance = 276;
+            splitContainer1.Size = new Size(622, 671);
+            splitContainer1.SplitterDistance = 328;
             splitContainer1.TabIndex = 22;
             // 
             // FrmMain
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(903, 614);
+            ClientSize = new Size(903, 723);
             Controls.Add(splitContainer1);
             Controls.Add(panel2);
             Controls.Add(panel1);
@@ -409,5 +450,9 @@
         private Button BtnClearLog;
         private Label label9;
         private SplitContainer splitContainer2;
+        private Label LblZ;
+        private Label LblY;
+        private Label LblX;
+        private Label label11;
     }
 }

@@ -62,7 +62,7 @@ namespace TerrainScanner.WinForms
 
         private void BtSelectMap_Click(object sender, EventArgs e)
         {
-            using var openFileDialog = new OpenFileDialog
+            using OpenFileDialog openFileDialog = new()
             {
                 Filter = "GeoTiff files (*.tif)|*.tif|All files (*.*)|*.*",
                 Title = "Load Map"
@@ -97,7 +97,7 @@ namespace TerrainScanner.WinForms
             catch (Exception ex)
             {
                 LogService.Log($"ОШИБКА загрузки карты: {ex.Message}");
-                MessageBox.Show($"Не удалось загрузить карту:\n{ex.Message}",
+                MessageBox.Show($"Не удалось загрузить карту:{Environment.NewLine}{ex.Message}",
                     "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -107,7 +107,7 @@ namespace TerrainScanner.WinForms
         {
             LogService.Log("=== Запуск генерации NMEA по пути пользователя ===");
 
-            var path = _drawerControl.GetUserPathAs2D();
+            List<Vector2> path = _drawerControl.GetUserPathAs2D();
 
             if (path.Count == 0)
             {
@@ -124,7 +124,7 @@ namespace TerrainScanner.WinForms
 
             const double droneAltitude = 5000.0;
 
-            foreach (var point in path)
+            foreach (Vector2 point in path)
             {
                 // Генерируем NMEA. point.Y - истинная высота рельефа.
                 string nmeaResult = _nmeaGenerator.Generate(droneAltitude, point.Y, 0, 30);
@@ -145,7 +145,7 @@ namespace TerrainScanner.WinForms
             LogService.Log($"Сгенерировано NMEA-сообщений: {generatedStrings.Count}");
 
             // Теперь мы сравниваем "Истинный рельеф" с "Измеренным рельефом (с шумом)"
-            var correlationResult = TerrainCorrelation.CalculateCorrelationDetailed(path, generatedPath);
+            CorrelationResult? correlationResult = TerrainCorrelation.CalculateCorrelationDetailed(path, generatedPath);
 
             if (correlationResult is null)
             {
@@ -161,7 +161,7 @@ namespace TerrainScanner.WinForms
             R2.Text = correlationResult.R2.ToString("F4");
 
             // Ограничим вывод массива, чтобы не "повесить" UI-контрол
-            var previewValues = correlationResult.InterpolatedBlueValues.Take(50);
+            IEnumerable<double> previewValues = correlationResult.InterpolatedBlueValues.Take(50);
             InterpolatedBlueValues.Text = string.Join("; ", previewValues.Select(v => v.ToString("F2")));
             if (correlationResult.InterpolatedBlueValues.Length > 50)
             {
@@ -177,229 +177,320 @@ namespace TerrainScanner.WinForms
                 $"RMSE: {correlationResult.RMSE:F2}, R²: {correlationResult.R2:F4}");
         }
 
+        #region DroneSimulation
         private void GenerateNmeaDataWithDrone()
         {
             if (_map is null)
             {
                 LogService.Log("ОШИБКА: Карта не загружена, симуляция невозможна");
-                MessageBox.Show("Сначала загрузите карту!", "Ошибка",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Сначала загрузите карту!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // Передаём в диалог размеры карты И географические границы
-            using FrmDrone frmDroneParams = new(
-                _map.Rows,
-                _map.Columns,
-                _map.MinLatitude,
-                _map.MaxLatitude,
-                _map.MinLongitude,
-                _map.MaxLongitude);
-
-            // 1. Получаем параметры от пользователя
-            if (frmDroneParams.ShowDialog(this) != DialogResult.OK)
+            using FrmDroneParams? frmDroneParams = ShowDroneParametersDialog();
+            if (frmDroneParams == null)
             {
-                LogService.Log("Пользователь отменил ввод параметров дрона");
                 return;
             }
 
-            // 2. Определяем стартовые координаты в зависимости от режима
-            double startLat, startLon;
+            (double? startLat, double? startLon) = DetermineStartCoordinates(frmDroneParams);
 
-            if (frmDroneParams.UseCellCoordinates)
+            if (startLat == null || startLon == null)
             {
-                startLat = _map.GetLatitude(frmDroneParams.Row);
-                startLon = _map.GetLongitude(frmDroneParams.Column);
-                LogService.Log(
-                    $"Стартовая ячейка [{frmDroneParams.Row}, {frmDroneParams.Column}] -> " +
-                    $"координаты ({startLat:F6}, {startLon:F6})");
-            }
-            else
-            {
-                startLat = frmDroneParams.Latitude;
-                startLon = frmDroneParams.Longitude;
-                LogService.Log($"Стартовые геокоординаты: ({startLat:F6}, {startLon:F6})");
-            }
-
-            // 3. Создаем дрона
-            var drone = new Drone
-            {
-                Altitude = frmDroneParams.DroneHeight,
-                Heading = frmDroneParams.Heading,
-                Speed = frmDroneParams.Speed,
-                Location = new TerrainPoint
-                {
-                    Latitude = startLat,
-                    Longitude = startLon,
-                    Height = (float)frmDroneParams.DroneHeight
-                }
-            };
-
-            LogService.Log(
-                $"=== Запуск симуляции полёта дрона ===\n" +
-                $"  H={frmDroneParams.DroneHeight}м, Heading={frmDroneParams.Heading}°, " +
-                $"Speed={frmDroneParams.Speed}м/с\n" +
-                $"  Start=({startLat:F6}, {startLon:F6}), Duration={frmDroneParams.Duration}с\n" +
-                $"  Freq={frmDroneParams.Frequency}Гц");
-
-            // 4. Симулируем полет
-            double updateIntervalSeconds = 1.0 / frmDroneParams.Frequency;
-            var simulator = new DroneFlightSimulator(
-                drone,
-                _map,
-                simulationDurationSeconds: frmDroneParams.Duration,
-                updateIntervalSeconds: updateIntervalSeconds);
-
-            var droneTrack = simulator.SimulateFlight();
-
-            if (droneTrack.Count == 0)
-            {
-                LogService.Log("ОШИБКА: Симуляция не вернула ни одной точки");
-                MessageBox.Show(
-                    "Симуляция не вернула ни одной точки.\n\n" +
-                    "Возможные причины:\n" +
-                    "• Дрон вылетел за границы карты\n" +
-                    "• Начальная ячейка содержит NoData (NaN)\n" +
-                    "• Скорость/длительность слишком малы",
-                    "Ошибка симуляции",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
                 return;
             }
 
-            LogService.Log($"Трек дрона построен. Точек: {droneTrack.Count}");
+            Drone drone = CreateDrone(frmDroneParams, startLat.Value, startLon.Value);
+            LogSimulationStart(frmDroneParams, startLat.Value, startLon.Value);
 
-            // 5. Отображаем путь дрона на карте
+            List<DroneTrackPoint> droneTrack = SimulateFlight(drone, frmDroneParams);
+            if (droneTrack == null)
+            {
+                return;
+            }
+
             _drawerControl.SetDronePath(droneTrack);
+            List<Vector2> truePath = BuildTruePath(droneTrack);
 
-            // 6. Преобразуем трек в формат (дистанция, высота) для корреляции
-            var truePath = droneTrack
-                .Select(p => new Vector2(p.Distance, p.TerrainHeight))
-                .ToList();
-
-            // 7. Получаем данные высотомера: из файла ИЛИ генерируем
-            List<Vector2> measuredPath = [];
-            List<string> generatedStrings = [];
-
-            if (!string.IsNullOrWhiteSpace(frmDroneParams.NmeaFilePath))
-            {
-                // === РЕЖИМ: Чтение данных из внешнего NMEA-файла ===
-                LogService.Log($"Чтение данных высотомера из файла: {frmDroneParams.NmeaFilePath}");
-
-                var fileAltitudes = NmeaGenerator.ReadRadarAltitudesFromFile(frmDroneParams.NmeaFilePath);
-                LogService.Log($"Прочитано значений из файла: {fileAltitudes.Count}");
-
-                int countToProcess = Math.Min(truePath.Count, fileAltitudes.Count);
-                if (truePath.Count != fileAltitudes.Count)
-                {
-                    LogService.Log(
-                        $"ПРЕДУПРЕЖДЕНИЕ: Количество точек трека ({truePath.Count}) и " +
-                        $"значений в файле ({fileAltitudes.Count}) не совпадает. " +
-                        $"Будет обработано {countToProcess} точек.");
-                }
-
-                for (int i = 0; i < countToProcess; i++)
-                {
-                    var point = truePath[i];
-                    var parsedRadarAlt = fileAltitudes[i];
-
-                    if (!parsedRadarAlt.HasValue)
-                    {
-                        LogService.Log($"Предупреждение: NMEA-строка #{i} не содержит валидной высоты");
-                        continue;
-                    }
-
-                    generatedStrings.Add($"[Файл] #{i}: {parsedRadarAlt.Value:F1}м");
-
-                    // Восстанавливаем высоту рельефа: Terrain = Drone_Alt - Radar_Alt
-                    double restoredTerrainHeight = frmDroneParams.DroneHeight - parsedRadarAlt.Value;
-                    measuredPath.Add(new Vector2(point.X, (float)restoredTerrainHeight));
-                }
-            }
-            else
-            {
-                // === РЕЖИМ: Генерация NMEA-данных симулятором ===
-                LogService.Log($"Генерация NMEA-данных (шум: ±{frmDroneParams.Noise}м)");
-
-                foreach (var point in truePath)
-                {
-                    string nmeaResult = _nmeaGenerator.Generate(
-                        frmDroneParams.DroneHeight,
-                        point.Y,
-                        0,
-                        frmDroneParams.Noise);
-
-                    var parsedRadarAlt = NmeaGenerator.ParseRadarAltitude(nmeaResult);
-
-                    if (!parsedRadarAlt.HasValue)
-                    {
-                        LogService.Log($"Предупреждение: Parsed Height from radar is null at X={point.X:F2}");
-                        continue;
-                    }
-
-                    generatedStrings.Add(nmeaResult);
-
-                    // Восстанавливаем высоту рельефа: Terrain = Drone_Alt - Radar_Alt
-                    double restoredTerrainHeight = frmDroneParams.DroneHeight - parsedRadarAlt.Value;
-                    measuredPath.Add(new Vector2(point.X, (float)restoredTerrainHeight));
-                }
-            }
-
+            (List<Vector2>? measuredPath, List<string> _) = GenerateMeasuredPath(truePath, frmDroneParams);
             if (measuredPath.Count == 0)
             {
                 LogService.Log("ОШИБКА: Не удалось получить ни одной точки измерений");
                 return;
             }
-
             LogService.Log($"Восстановлено измерений: {measuredPath.Count}");
 
-            // 8. Расчет корреляции
-            var correlationResult = TerrainCorrelation.CalculateCorrelationDetailed(truePath, measuredPath);
-
-            if (correlationResult is null)
+            CorrelationResult? correlationResult = CalculateCorrelation(truePath, measuredPath);
+            if (correlationResult == null)
             {
-                LogService.Log("ОШИБКА: Расчет корреляции вернул null");
                 return;
             }
 
-            // 9. Вывод метрик в UI
+            UpdateUiWithMetrics(correlationResult, droneTrack, frmDroneParams);
+            _graphControl.DrawGraphs(truePath, measuredPath);
+            LogSimulationCompletion(frmDroneParams, droneTrack.Count, measuredPath.Count, correlationResult);
+        }
+
+        #region Helpers: Инициализация и параметры
+
+        private FrmDroneParams? ShowDroneParametersDialog()
+        {
+            if (_map == null) { return null; }
+
+            FrmDroneParams frm = new(
+                _map.Rows, _map.Columns,
+                _map.MinLatitude, _map.MaxLatitude,
+                _map.MinLongitude, _map.MaxLongitude);
+
+            if (frm.ShowDialog(this) != DialogResult.OK)
+            {
+                LogService.Log("Пользователь отменил ввод параметров дрона");
+                frm.Dispose();
+                return null;
+            }
+            return frm;
+        }
+
+        private (double? startLat, double? startLon) DetermineStartCoordinates(FrmDroneParams p)
+        {
+            if (_map == null) { return (null, null); }
+
+            if (p.UseCellCoordinates)
+            {
+                double startLat = _map.GetLatitude(p.Row);
+                double startLon = _map.GetLongitude(p.Column);
+                LogService.Log($"Стартовая ячейка [{p.Row}, {p.Column}] -> координаты ({startLat:F6}, {startLon:F6})");
+                return (startLat, startLon);
+            }
+
+            LogService.Log($"Стартовые геокоординаты: ({p.Latitude:F6}, {p.Longitude:F6})");
+            return (p.Latitude, p.Longitude);
+        }
+
+        private static Drone CreateDrone(FrmDroneParams p, double startLat, double startLon)
+        {
+            return new Drone
+            {
+                Altitude = p.DroneHeight,
+                Heading = p.Heading,
+                Speed = p.Speed,
+                Location = new TerrainPoint
+                {
+                    Latitude = startLat,
+                    Longitude = startLon,
+                    Height = (float)p.DroneHeight
+                }
+            };
+        }
+
+        private static void LogSimulationStart(FrmDroneParams p, double startLat, double startLon)
+        {
+            LogService.Log(
+                $"=== Запуск симуляции полёта дрона ==={Environment.NewLine}" +
+                $"  H={p.DroneHeight}м, Heading={p.Heading}°, Speed={p.Speed}м/с{Environment.NewLine}" +
+                $"  Start=({startLat:F6}, {startLon:F6}), Duration={p.Duration}с{Environment.NewLine}" +
+                $"  Freq={p.Frequency}Гц");
+        }
+
+        #endregion
+
+        #region Helpers: Симуляция и сбор данных
+
+        // Замените DroneTrackPoint на реальный тип элемента, возвращаемого SimulateFlight(), если он называется иначе
+        private List<DroneTrackPoint> SimulateFlight(Drone drone, FrmDroneParams p)
+        {
+            if (_map == null) { return []; }
+
+            double updateIntervalSeconds = 1.0 / p.Frequency;
+            DroneFlightSimulator simulator = new(
+                drone, _map,
+                simulationDurationSeconds: p.Duration,
+                updateIntervalSeconds: updateIntervalSeconds);
+
+            List<DroneTrackPoint> droneTrack = simulator.SimulateFlight();
+
+            if (droneTrack.Count == 0)
+            {
+                LogService.Log("ОШИБКА: Симуляция не вернула ни одной точки");
+                MessageBox.Show(
+                    $"Симуляция не вернула ни одной точки.{Environment.NewLine}{Environment.NewLine}" +
+                    $"Возможные причины:{Environment.NewLine}" +
+                    $"• Дрон вылетел за границы карты{Environment.NewLine}" +
+                    $"• Начальная ячейка содержит NoData (NaN){Environment.NewLine}" +
+                    "• Скорость/длительность слишком малы",
+                    "Ошибка симуляции", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return [];
+            }
+
+            LogService.Log($"Трек дрона построен. Точек: {droneTrack.Count}");
+            return droneTrack;
+        }
+
+        private static List<Vector2> BuildTruePath(List<DroneTrackPoint> droneTrack)
+        {
+            return droneTrack.Select(p => new Vector2(p.Distance, p.TerrainHeight)).ToList();
+        }
+
+        private (List<Vector2> measuredPath, List<string> generatedStrings) GenerateMeasuredPath(
+            List<Vector2> truePath, FrmDroneParams p)
+        {
+            List<Vector2> measuredPath = [];
+            List<string> generatedStrings = [];
+
+            if (!string.IsNullOrWhiteSpace(p.NmeaFilePath))
+            {
+                ProcessFileAltitudes(truePath, p, measuredPath, generatedStrings);
+            }
+            else
+            {
+                GenerateSimulatedAltitudes(truePath, p, measuredPath, generatedStrings);
+            }
+
+            return (measuredPath, generatedStrings);
+        }
+
+        private static void ProcessFileAltitudes(
+            List<Vector2> truePath, FrmDroneParams p,
+            List<Vector2> measuredPath, List<string> generatedStrings)
+        {
+            LogService.Log($"Чтение данных высотомера из файла: {p.NmeaFilePath}");
+
+            if (string.IsNullOrEmpty(p.NmeaFilePath) || p.NmeaFilePath is null)
+            {
+                return;
+            }
+
+            List<float?> fileAltitudes = NmeaGenerator.ReadRadarAltitudesFromFile(p.NmeaFilePath);
+            LogService.Log($"Прочитано значений из файла: {fileAltitudes.Count}");
+
+            int countToProcess = Math.Min(truePath.Count, fileAltitudes.Count);
+            if (truePath.Count != fileAltitudes.Count)
+            {
+                LogService.Log(
+                    $"ПРЕДУПРЕЖДЕНИЕ: Количество точек трека ({truePath.Count}) и " +
+                    $"значений в файле ({fileAltitudes.Count}) не совпадает. " +
+                    $"Будет обработано {countToProcess} точек.");
+            }
+
+            for (int i = 0; i < countToProcess; i++)
+            {
+                Vector2 point = truePath[i];
+                var parsedRadarAlt = fileAltitudes[i];
+
+                if (!parsedRadarAlt.HasValue)
+                {
+                    LogService.Log($"Предупреждение: NMEA-строка #{i} не содержит валидной высоты");
+                    continue;
+                }
+
+                generatedStrings.Add($"[Файл] #{i}: {parsedRadarAlt.Value:F1}м");
+                measuredPath.Add(new Vector2(point.X, (float)(p.DroneHeight - parsedRadarAlt.Value)));
+            }
+        }
+
+        private void GenerateSimulatedAltitudes(
+            List<Vector2> truePath, FrmDroneParams p,
+            List<Vector2> measuredPath, List<string> generatedStrings)
+        {
+            LogService.Log($"Генерация NMEA-данных (шум: ±{p.Noise}м)");
+
+            foreach (Vector2 point in truePath)
+            {
+                string nmeaResult = _nmeaGenerator.Generate(p.DroneHeight, point.Y, 0, p.Noise);
+                var parsedRadarAlt = NmeaGenerator.ParseRadarAltitude(nmeaResult);
+
+                if (!parsedRadarAlt.HasValue)
+                {
+                    LogService.Log($"Предупреждение: Parsed Height from radar is null at X={point.X:F2}");
+                    continue;
+                }
+
+                generatedStrings.Add(nmeaResult);
+                measuredPath.Add(new Vector2(point.X, (float)(p.DroneHeight - parsedRadarAlt.Value)));
+            }
+        }
+
+        #endregion
+
+        #region Helpers: Корреляция и UI
+
+        // Замените dynamic на реальный тип результата (например, CorrelationResult)
+        private static CorrelationResult? CalculateCorrelation(List<Vector2> truePath, List<Vector2> measuredPath)
+        {
+            CorrelationResult? correlationResult = TerrainCorrelation.CalculateCorrelationDetailed(truePath, measuredPath);
+            if (correlationResult is null)
+            {
+                LogService.Log("ОШИБКА: Расчет корреляции вернул null");
+                return null;
+            }
+            return correlationResult;
+        }
+
+        private void UpdateUiWithMetrics(
+            CorrelationResult correlationResult,
+            List<DroneTrackPoint> droneTrack,
+            FrmDroneParams p)
+        {
             PearsonCorrelation.Text = correlationResult.PearsonCorrelation.ToString("F4");
             SpearmanCorrelation.Text = correlationResult.SpearmanCorrelation.ToString("F4");
             RMSE.Text = correlationResult.RMSE.ToString("F2");
             MAE.Text = correlationResult.MAE.ToString("F2");
             R2.Text = correlationResult.R2.ToString("F4");
 
-            var previewValues = correlationResult.InterpolatedBlueValues.Take(50);
+            DroneTrackPoint lastPoint = droneTrack[^1];
+            LblX.Text = lastPoint.Longitude.ToString("F6");
+            LblY.Text = lastPoint.Latitude.ToString("F6");
+            LblZ.Text = p.DroneHeight.ToString("F6");
+
+            IEnumerable<double> previewValues = correlationResult.InterpolatedBlueValues.Take(50);
             InterpolatedBlueValues.Text = string.Join("; ", previewValues.Select(v => v.ToString("F2")));
             if (correlationResult.InterpolatedBlueValues.Length > 50)
             {
                 InterpolatedBlueValues.Text += " ...";
             }
+        }
 
-            // 10. Строим графики профиля рельефа
-            _graphControl.DrawGraphs(truePath, measuredPath);
-
+        private static void LogSimulationCompletion(
+            FrmDroneParams p, int trackCount, int measurementCount, dynamic correlationResult)
+        {
             LogService.Log(
-                $"=== Симуляция завершена ===\n" +
-                $"  Источник данных: {(!string.IsNullOrWhiteSpace(frmDroneParams.NmeaFilePath) ? "Внешний файл" : "Симулятор")}\n" +
-                $"  Точек трека: {droneTrack.Count}\n" +
-                $"  Точек измерений: {measuredPath.Count}\n" +
-                $"  Pearson: {correlationResult.PearsonCorrelation:F4}\n" +
-                $"  RMSE: {correlationResult.RMSE:F2}\n" +
+                $"=== Симуляция завершена ==={Environment.NewLine}" +
+                $"  Источник данных: {(!string.IsNullOrWhiteSpace(p.NmeaFilePath) ? "Внешний файл" : "Симулятор")}{Environment.NewLine}" +
+                $"  Точек трека: {trackCount}{Environment.NewLine}" +
+                $"  Точек измерений: {measurementCount}{Environment.NewLine}" +
+                $"  Pearson: {correlationResult.PearsonCorrelation:F4}{Environment.NewLine}" +
+                $"  RMSE: {correlationResult.RMSE:F2}{Environment.NewLine}" +
                 $"  R²: {correlationResult.R2:F4}");
+        }
+
+        #endregion
+        #endregion
+
+        /// <summary>
+        /// Блокирует/разблокирует кнопки управления симуляцией
+        /// </summary>
+        private void SetSimulationControlsEnabled(bool enabled)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(() => SetSimulationControlsEnabled(enabled));
+                return;
+            }
+
+            BtnDroneSimulate.Enabled = enabled;
+            BtnGraph.Enabled = enabled;
+            BtSelectMap.Enabled = enabled;
         }
 
         #endregion
 
         private void BtnGraph_Click(object sender, EventArgs e)
         {
-            LogService.Log("Нажата кнопка: Генерация NMEA по пути пользователя");
             GenerateNmeaData();
         }
 
         private void BtnDroneSimulate_Click(object sender, EventArgs e)
         {
-            LogService.Log("Нажата кнопка: Симуляция полёта дрона");
             GenerateNmeaDataWithDrone();
         }
 

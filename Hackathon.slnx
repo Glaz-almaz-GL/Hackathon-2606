@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="ReadMe.md" />
+  </Folder>
   <Project Path="Hackathon/Hackathon.csproj" />
   <Project Path="TerrainNavigation.Core/TerrainNavigation.Core.csproj" Id="37b54ff7-1f0e-4628-b0d4-f582bdd52ebc" />
   <Project Path="TerrainNavigation.WinForms/TerrainNavigation.WinForms.csproj" Id="6a30ca57-22e4-4452-b58b-aa88933969e3" />

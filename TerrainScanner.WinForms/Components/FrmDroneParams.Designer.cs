@@ -1,6 +1,6 @@
 ﻿namespace TerrainScanner.WinForms.Components
 {
-    partial class FrmDrone
+    partial class FrmDroneParams
     {
         /// <summary>
         /// Required designer variable.
