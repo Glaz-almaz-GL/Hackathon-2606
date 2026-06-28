@@ -1,8 +1,12 @@
-﻿using System.Text;
+﻿using System.Drawing;
+using System.Drawing.Imaging;
+using System.Globalization;
+using System.Runtime.InteropServices;
+using System.Text;
 
-namespace TerrainScanner.Core.Models
+namespace TerrainScanner.Core.Models.Terrain
 {
-    public sealed class TerrainMap
+    public sealed class TerrainMap : IDisposable
     {
         // Плоский массив для максимальной производительности и локальности кэша
         private readonly float[] _heights;
@@ -30,6 +34,8 @@ namespace TerrainScanner.Core.Models
 
         public float MinHeight { get; }
         public float MaxHeight { get; }
+
+        private bool _disposed;
 
         public TerrainMap(MapOptions options)
         {
@@ -61,8 +67,12 @@ namespace TerrainScanner.Core.Models
 
         public float GetHeight(int row, int column)
         {
-            return _heights[(row * Columns) + column];
+            if (!IsInside(row, column))
+                throw new ArgumentOutOfRangeException($"Координаты [{row}, {column}] выходят за пределы карты [{Rows}x{Columns}].");
+
+            return _heights![(row * Columns) + column];
         }
+        public ReadOnlyMemory<float> GetHeightMap() => new(_heights);
 
         public TerrainPoint GetPoint(int row, int column)
         {
@@ -84,12 +94,12 @@ namespace TerrainScanner.Core.Models
 
         public int GetRow(double latitude)
         {
-            return (int)Math.Round((latitude - MinLatitude) / LatitudeStep);
+            return (int)Math.Floor((latitude - MinLatitude) / LatitudeStep);
         }
 
         public int GetColumn(double longitude)
         {
-            return (int)Math.Round((longitude - MinLongitude) / LongitudeStep);
+            return (int)Math.Floor((longitude - MinLongitude) / LongitudeStep);
         }
 
         public double GetLatitude(int row)
@@ -152,7 +162,7 @@ namespace TerrainScanner.Core.Models
 
                 for (int c = 0; c < Columns; c++)
                 {
-                    writer.Write(GetHeight(r, c));
+                    writer.Write(GetHeight(r, c).ToString(CultureInfo.InvariantCulture));
                     if (c < Columns - 1)
                     {
                         writer.Write(';');
@@ -162,6 +172,87 @@ namespace TerrainScanner.Core.Models
             }
         }
 
+        public System.Drawing.Bitmap ToBitmap()
+        {
+            // Создаем битмап с форматом 24 бита на пиксель (BGR)
+            Bitmap bitmap = new(Columns, Rows, PixelFormat.Format24bppRgb);
+            Rectangle rect = new(0, 0, Columns, Rows);
+
+            // Блокируем биты для прямой записи в память
+            var bmpData = bitmap.LockBits(rect, ImageLockMode.WriteOnly, bitmap.PixelFormat);
+
+            int bytesPerPixel = 3; // 24 бита = 3 байта
+            int stride = bmpData.Stride; // Ширина строки в байтах (с учетом выравнивания)
+            byte[] rowBuffer = new byte[stride];
+
+            // Вычисляем диапазон высот для нормализации
+            float range = MaxHeight - MinHeight;
+            if (range <= float.Epsilon)
+            {
+                range = 1f; // Защита от деления на ноль, если все высоты одинаковы
+            }
+
+            IntPtr currentScanline = bmpData.Scan0;
+
+            for (int r = 0; r < Rows; r++)
+            {
+                for (int c = 0; c < Columns; c++)
+                {
+                    float h = GetHeight(r, c);
+                    byte gray;
+
+                    // Обработка пропусков данных (NoData), которые были заменены на NaN при загрузке
+                    if (float.IsNaN(h))
+                    {
+                        gray = 0; // Черный цвет для "дыр" в рельефе
+                    }
+                    else
+                    {
+                        // Нормализация высоты к диапазону [0, 255] относительно Min/Max высот карты.
+                        // Это дает максимальный контраст для визуализации конкретного участка.
+                        float normalized = (h - MinHeight) / range;
+                        gray = (byte)Math.Clamp(normalized * 255f, 0, 255);
+                    }
+
+                    int offset = c * bytesPerPixel;
+
+                    // Формат пикселя в памяти: BGR (Синий, Зеленый, Красный)
+                    rowBuffer[offset] = gray;     // B
+                    rowBuffer[offset + 1] = gray; // G
+                    rowBuffer[offset + 2] = gray; // R
+                }
+
+                // Копируем готовую строку пикселей в память битмапа
+                Marshal.Copy(rowBuffer, 0, currentScanline, stride);
+
+                // Переходим к следующей строке в памяти
+                currentScanline = IntPtr.Add(currentScanline, stride);
+            }
+
+            bitmap.UnlockBits(bmpData);
+            return bitmap;
+        }
+
         #endregion
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+        private void Dispose(bool disposing)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            if (disposing)
+            {
+                // Контролируемое освобождение
+            }
+
+            Array.Clear(_heights);
+            _disposed = true;
+        }
     }
 }

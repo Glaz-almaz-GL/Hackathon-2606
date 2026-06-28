@@ -1,6 +1,6 @@
 ﻿using OSGeo.GDAL;
-using System.Runtime.Intrinsics.X86;
-using TerrainScanner.Core.Models;
+using TerrainScanner.Core.Models.Terrain;
+using TerrainScanner.Core.Services;
 
 namespace TerrainScanner.Core
 {
@@ -9,163 +9,161 @@ namespace TerrainScanner.Core
         /// <summary>
         /// Загружает карту из GeoTIFF файла.
         /// </summary>
-        public TerrainMap LoadFromTif(string filePath)
+        public TerrainMap LoadFromTif(string filePath, CancellationToken cancellationToken = default)
         {
+            LogService.Log($"Начало загрузки карты из файла: {filePath}");
+
             if (!File.Exists(filePath))
             {
+                LogService.Log($"ОШИБКА: Файл не найден: {filePath}");
                 throw new FileNotFoundException("Файл TIFF не найден", filePath);
             }
 
             using Dataset ds = Gdal.Open(filePath, Access.GA_ReadOnly);
-            ArgumentNullException.ThrowIfNull(ds);
+            if (ds == null)
+            {
+                LogService.Log($"ОШИБКА: GDAL не смог открыть файл: {filePath}");
+                throw new InvalidDataException($"Не удалось открыть GeoTIFF файл: {filePath}");
+            }
 
-            int width = ds.RasterXSize;
-            int height = ds.RasterYSize;
+            int width = ds.RasterXSize;  // Количество столбцов (Columns)
+            int height = ds.RasterYSize; // Количество строк (Rows)
 
             if (width <= 0 || height <= 0)
             {
+                LogService.Log($"ОШИБКА: Некорректные размеры растра: {width}x{height}");
                 throw new InvalidDataException("Некорректные размеры растра");
             }
 
+            LogService.Log($"Размер растра: {width} x {height} пикселей");
+
+            // Считываем аффинное преобразование (GeoTransform)
             double[] gt = new double[6];
             ds.GetGeoTransform(gt);
 
+            // 1. Вычисляем границы карты из GeoTransform (учитываем все 4 угла на случай ротации)
+            double lon1 = gt[0];
+            double lat1 = gt[3];
+            double lon2 = gt[0] + (width * gt[1]);
+            double lat2 = gt[3] + (width * gt[4]);
+            double lon3 = gt[0] + (height * gt[2]);
+            double lat3 = gt[3] + (height * gt[5]);
+            double lon4 = gt[0] + (width * gt[1]) + (height * gt[2]);
+            double lat4 = gt[3] + (width * gt[4]) + (height * gt[5]);
+
+            double minLon = Math.Min(Math.Min(lon1, lon2), Math.Min(lon3, lon4));
+            double maxLon = Math.Max(Math.Max(lon1, lon2), Math.Max(lon3, lon4));
+            double minLat = Math.Min(Math.Min(lat1, lat2), Math.Min(lat3, lat4));
+            double maxLat = Math.Max(Math.Max(lat1, lat2), Math.Max(lat3, lat4));
+
+            LogService.Log($"Географические границы: Lon [{minLon:F6}, {maxLon:F6}], Lat [{minLat:F6}, {maxLat:F6}]");
+
+            // 2. Вычисляем шаги сетки в градусах
+            double lonStep = Math.Abs(gt[1]);
+            double latStep = Math.Abs(gt[5]);
+
             using Band band = ds.GetRasterBand(1);
-            ArgumentNullException.ThrowIfNull(band);
+            if (band == null)
+            {
+                LogService.Log($"ОШИБКА: Не удалось получить растровый слой (Band 1) из файла: {filePath}");
+                throw new InvalidDataException("Не удалось получить растровый слой");
+            }
 
             band.GetNoDataValue(out double noDataValue, out int hasNoData);
 
+            if (hasNoData == 1)
+            {
+                LogService.Log($"Значение NoData: {noDataValue}");
+            }
+            else
+            {
+                LogService.Log("Значение NoData не определено в файле");
+            }
+
+            // 3. Читаем данные напрямую в плоский массив
             float[] zValues = new float[width * height];
+            LogService.Log($"Чтение данных растра размером {width}x{height} в память...");
+
             band.ReadRaster(0, 0, width, height, zValues, width, height, 0, 0);
 
-            TerrainPoint[,] heights = new TerrainPoint[width, height];
+            cancellationToken.ThrowIfCancellationRequested();
+
+            LogService.Log($"Данные прочитаны. Всего значений: {zValues.Length:N0}");
+
+            // 4. Обработка NoData и поиск Min/Max высот за один проход
+            float minH = float.MaxValue;
+            float maxH = float.MinValue;
             bool hasValidData = false;
+            int noDataCount = 0;
 
-            // Порядок обхода: строки (Y), затем столбцы (X)
-            for (int row = 0; row < height; row++)
+            for (int i = 0; i < zValues.Length; i++)
             {
-                for (int col = 0; col < width; col++)
+                // Заменяем NoData на NaN для сохранения структуры сетки
+                if (hasNoData == 1 && Math.Abs(zValues[i] - noDataValue) < 0.001)
                 {
-                    int bufferIndex = (row * width) + col;
-                    float z = zValues[bufferIndex];
-
-                    // Пропускаем NoData
-                    if (hasNoData == 1 && Math.Abs(z - noDataValue) < 0.001)
+                    zValues[i] = float.NaN;
+                    noDataCount++;
+                }
+                else
+                {
+                    if (zValues[i] < minH)
                     {
-                        continue;
+                        minH = zValues[i];
+                    }
+
+                    if (zValues[i] > maxH)
+                    {
+                        maxH = zValues[i];
                     }
 
                     hasValidData = true;
-
-                    // Вычисляем координаты центра пикселя
-                    double lon = gt[0] + ((col + 0.5) * gt[1]) + ((row + 0.5) * gt[2]);
-                    double lat = gt[3] + ((col + 0.5) * gt[4]) + ((row + 0.5) * gt[5]);
-
-                    heights[col, row] = new TerrainPoint
-                    {
-                        Longitude = lon,
-                        Latitude = lat,
-                        Height = z
-                    };
                 }
             }
 
             if (!hasValidData)
             {
+                LogService.Log("ОШИБКА: В файле TIFF нет валидных данных высот");
                 throw new InvalidDataException("В файле TIFF нет валидных данных высот");
             }
 
-            // -----------------------------
-            // Делегирование общей логики
-            // -----------------------------
-            return CreateTerrainMapFromGrid(heights, width, height);
-        }
+            LogService.Log($"Обработка данных завершена. NoData ячеек: {noDataCount:N0}, Валидных: {zValues.Length - noDataCount:N0}");
+            LogService.Log($"Диапазон высот: {minH:F2} - {maxH:F2} м");
 
-        /// <summary>
-        /// Общий метод для создания TerrainMap из готовой сетки точек.
-        /// Вычисляет границы, статистику и шаги сетки.
-        /// </summary>
-        private TerrainMap CreateTerrainMapFromGrid(TerrainPoint[,] heights, int xSize, int ySize)
-        {
-            double minX = double.MaxValue;
-            double maxX = double.MinValue;
-            double minY = double.MaxValue;
-            double maxY = double.MinValue;
+            // 5. Вычисляем размер клетки в метрах (аппроксимация для центра карты)
+            double centerLatRad = (minLat + maxLat) / 2.0 * Math.PI / 180.0;
+            double cellSizeY = latStep * 111320.0;
+            double cellSizeX = lonStep * 111320.0 * Math.Cos(centerLatRad);
 
-            float minH = float.MaxValue;
-            float maxH = float.MinValue;
-            double sum = 0;
-            double sumSq = 0;
-            int validCount = 0;
+            LogService.Log($"Размер клетки: {cellSizeX:F2} x {cellSizeY:F2} м (аппроксимация для центра карты)");
 
-            // Проход по сетке для сбора статистики
-            for (int row = 0; row < ySize; row++)
-            {
-                for (int col = 0; col < xSize; col++)
-                {
-                    var p = heights[col, row];
+            LogService.Log("Инициализация объекта TerrainMap...");
 
-                    if (p.Latitude < minX) minX = p.Latitude;
-                    if (p.Latitude > maxX) maxX = p.Latitude;
-                    if (p.Longitude < minY) minY = p.Longitude;
-                    if (p.Longitude > maxY) maxY = p.Longitude;
-
-                    if (p.Height < minH) minH = p.Height;
-                    if (p.Height > maxH) maxH = p.Height;
-
-                    sum += p.Height;
-                    sumSq += p.Height * p.Height;
-                    validCount++;
-                }
-            }
-
-            if (validCount == 0)
-            {
-                throw new InvalidDataException("Нет валидных данных для построения карты");
-            }
-
-            // Вычисляем шаг сетки
-            double xStep = 0;
-            double yStep = 0;
-
-            if (xSize > 1)
-            {
-                // Ищем первую валидную пару по X
-                for (int c = 1; c < xSize; c++)
-                {
-                    if (heights[c, 0].Longitude != 0)
-                    {
-                        xStep = Math.Abs(heights[c, 0].Longitude - heights[0, 0].Longitude);
-                        break;
-                    }
-                }
-            }
-
-            if (ySize > 1)
-            {
-                // Ищем первую валидную пару по Y
-                for (int r = 1; r < ySize; r++)
-                {
-                    if (heights[0, r].Latitude != 0)
-                    {
-                        yStep = Math.Abs(heights[0, r].Latitude - heights[0, 0].Latitude);
-                        break;
-                    }
-                }
-            }
-
-            return new TerrainMap(new MapOptions(
-                heights,
-                MinLongitude: minX,
-                MaxLongitude: maxX,
-                MinLatitude: minY,
-                MaxLatitude: maxY,
-                LongitudeStep: xStep,
-                LatitudeStep: yStep,
+            MapOptions options = new(
+                Heights: zValues,
+                Rows: height,
+                Columns: width,
+                MinLongitude: minLon,
+                MaxLongitude: maxLon,
+                MinLatitude: minLat,
+                MaxLatitude: maxLat,
+                LongitudeStep: lonStep,
+                LatitudeStep: latStep,
                 MinHeight: minH,
                 MaxHeight: maxH,
-                CellSizeX: xStep * 111320.0,
-                CellSizeY: yStep * 111320.0));
+                CellSizeX: cellSizeX,
+                CellSizeY: cellSizeY
+            );
+
+            TerrainMap map = new(options);
+
+            LogService.Log(
+                $"Карта успешно загружена:\n" +
+                $"  Размеры: {map.Rows} x {map.Columns}\n" +
+                $"  Высоты: {map.MinHeight:F2} - {map.MaxHeight:F2} м\n" +
+                $"  Размер клетки: {map.CellSizeX:F2} x {map.CellSizeY:F2} м\n" +
+                $"  Границы: Lon [{map.MinLongitude:F6}, {map.MaxLongitude:F6}], Lat [{map.MinLatitude:F6}, {map.MaxLatitude:F6}]");
+
+            return map;
         }
     }
 }

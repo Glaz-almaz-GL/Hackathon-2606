@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using OSGeo.GDAL;
 using System.Globalization;
 

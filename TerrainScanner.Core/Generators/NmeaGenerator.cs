@@ -1,23 +1,36 @@
-﻿using Microsoft.Extensions.Logging;
-using System.Globalization;
+﻿using System.Globalization;
+using TerrainScanner.Core.Services;
 
 namespace TerrainScanner.Core.Generators
 {
     /// <summary>
     /// Генератор NMEA сообщений (радиовысотомер).
     /// </summary>
-    public sealed class NmeaGenerator(ILogger<NmeaGenerator>? logger = null)
+    public sealed class NmeaGenerator
     {
-        private readonly ILogger<NmeaGenerator>? _logger = logger;
         private readonly Random _rnd = new();
 
         /// <summary>
         /// Генерация NMEA строки GGA (упрощённая модель).
         /// </summary>
-        public string Generate(double altitudeMeters, double terrainHeight)
+        /// <param name="altitudeMeters">Высота дрона над уровнем моря (метры).</param>
+        /// <param name="terrainHeight">Высота рельефа под дроном (метры над уровнем моря).</param>
+        /// <param name="noiseMin">Минимальное значение шума (метры). Если null — используется диапазон [0, 30].</param>
+        /// <param name="noiseMax">Максимальное значение шума (метры). Если null — используется диапазон [0, 30].</param>
+        public string Generate(double altitudeMeters, double terrainHeight, double? noiseMin = null, double? noiseMax = null)
         {
+            double noise;
+
             // Радиовысота = высота - рельеф + шум
-            double noise = (_rnd.NextDouble() - 0.5) * 2.0; // +-1 м шум
+            if (noiseMin != null && noiseMax != null)
+            {
+                noise = noiseMin.Value + (_rnd.NextDouble() * (noiseMax.Value - noiseMin.Value));
+            }
+            else
+            {
+                noise = 0 + (_rnd.NextDouble() * (30 - 0));
+            }
+
             double radarAlt = altitudeMeters - terrainHeight + noise;
 
             if (radarAlt < 0)
@@ -30,12 +43,30 @@ namespace TerrainScanner.Core.Generators
             // NMEA 0183 GGA (Global Positioning Fix Data — глобальные данные)
             string result = $"$GPGGA,{time},,,,,,,,{radarAlt:F1},M,,M,,*00";
 
-            if (_logger?.IsEnabled(LogLevel.Information) == true)
-            {
-                _logger?.LogInformation("Generated Nmea Data: {Data}", result);
-            }
+            LogService.Log($"Generated Nmea Data: {result}");
 
             return result;
+        }
+
+        /// <summary>
+        /// Парсит значение радиовысоты из NMEA-строки GGA.
+        /// </summary>
+        /// <param name="nmeaSentence">NMEA-строка формата GGA.</param>
+        /// <returns>Значение высоты или null, если данные отсутствуют или некорректны.</returns>
+        public static float? ParseRadarAltitude(string nmeaSentence)
+        {
+            if (string.IsNullOrWhiteSpace(nmeaSentence))
+                return null;
+
+            var parts = nmeaSentence.Split(',');
+
+            // Проверяем, что строка содержит достаточно полей и поле не пустое
+            if (parts.Length > 9 && !string.IsNullOrEmpty(parts[9]) && float.TryParse(parts[9], NumberStyles.Float, CultureInfo.InvariantCulture, out float altitude))
+            {
+                return altitude;
+            }
+
+            return null; // Возвращаем null, если данные отсутствуют (NoData) или некорректны
         }
     }
 }

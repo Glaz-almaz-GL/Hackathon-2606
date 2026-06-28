@@ -147,7 +147,7 @@
             mainPanel.Dock = DockStyle.Fill;
             mainPanel.Location = new Point(0, 0);
             mainPanel.Name = "mainPanel";
-            mainPanel.Size = new Size(637, 278);
+            mainPanel.Size = new Size(637, 315);
             mainPanel.TabIndex = 3;
             // 
             // txtLog
@@ -160,7 +160,8 @@
             // 
             // splitContainer1
             // 
-            splitContainer1.Location = new Point(12, 55);
+            splitContainer1.Dock = DockStyle.Left;
+            splitContainer1.Location = new Point(0, 49);
             splitContainer1.Name = "splitContainer1";
             splitContainer1.Orientation = Orientation.Horizontal;
             // 
@@ -171,8 +172,8 @@
             // splitContainer1.Panel2
             // 
             splitContainer1.Panel2.Controls.Add(graphPanel);
-            splitContainer1.Size = new Size(637, 491);
-            splitContainer1.SplitterDistance = 278;
+            splitContainer1.Size = new Size(637, 557);
+            splitContainer1.SplitterDistance = 315;
             splitContainer1.TabIndex = 5;
             // 
             // graphPanel
@@ -180,7 +181,7 @@
             graphPanel.Dock = DockStyle.Fill;
             graphPanel.Location = new Point(0, 0);
             graphPanel.Name = "graphPanel";
-            graphPanel.Size = new Size(637, 209);
+            graphPanel.Size = new Size(637, 238);
             graphPanel.TabIndex = 0;
             // 
             // btTestData

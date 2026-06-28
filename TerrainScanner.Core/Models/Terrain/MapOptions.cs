@@ -1,4 +1,4 @@
-﻿namespace TerrainScanner.Core.Models
+﻿namespace TerrainScanner.Core.Models.Terrain
 {
     public sealed record class MapOptions(
         float[] Heights,
