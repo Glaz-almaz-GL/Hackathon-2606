@@ -35,7 +35,7 @@
             TxtHeading = new TextBox();
             TxtRow = new TextBox();
             TxtFrequency = new TextBox();
-            label1 = new Label();
+            LblNoise = new Label();
             label2 = new Label();
             label3 = new Label();
             label4 = new Label();
@@ -46,6 +46,15 @@
             BtnCancel = new Button();
             LblColumnBounds = new Label();
             TxtColumn = new TextBox();
+            TxtLon = new TextBox();
+            TxtLat = new TextBox();
+            IsGeoMode = new CheckBox();
+            TxtNmeaPath = new TextBox();
+            LblNmeaPath = new Label();
+            LblLatBounds = new Label();
+            LblLonBounds = new Label();
+            BtnSelectNmea = new Button();
+            ChkUseExternalNmea = new CheckBox();
             SuspendLayout();
             // 
             // TxtNoise
@@ -104,14 +113,14 @@
             TxtFrequency.TabIndex = 6;
             TxtFrequency.Text = "1.0";
             // 
-            // label1
+            // LblNoise
             // 
-            label1.AutoSize = true;
-            label1.Location = new Point(12, 9);
-            label1.Name = "label1";
-            label1.Size = new Size(157, 15);
-            label1.TabIndex = 7;
-            label1.Text = "Шум радиовысотомера (м)";
+            LblNoise.AutoSize = true;
+            LblNoise.Location = new Point(12, 9);
+            LblNoise.Name = "LblNoise";
+            LblNoise.Size = new Size(157, 15);
+            LblNoise.TabIndex = 7;
+            LblNoise.Text = "Шум радиовысотомера (м)";
             // 
             // label2
             // 
@@ -169,7 +178,7 @@
             // 
             // BtnOk
             // 
-            BtnOk.Location = new Point(103, 475);
+            BtnOk.Location = new Point(105, 581);
             BtnOk.Name = "BtnOk";
             BtnOk.Size = new Size(75, 23);
             BtnOk.TabIndex = 14;
@@ -179,7 +188,7 @@
             // 
             // BtnCancel
             // 
-            BtnCancel.Location = new Point(10, 475);
+            BtnCancel.Location = new Point(14, 581);
             BtnCancel.Name = "BtnCancel";
             BtnCancel.Size = new Size(75, 23);
             BtnCancel.TabIndex = 15;
@@ -204,11 +213,99 @@
             TxtColumn.TabIndex = 16;
             TxtColumn.Text = "0";
             // 
+            // TxtLon
+            // 
+            TxtLon.Location = new Point(12, 340);
+            TxtLon.Name = "TxtLon";
+            TxtLon.Size = new Size(166, 23);
+            TxtLon.TabIndex = 20;
+            TxtLon.Text = "0";
+            // 
+            // TxtLat
+            // 
+            TxtLat.Location = new Point(12, 287);
+            TxtLat.Name = "TxtLat";
+            TxtLat.Size = new Size(166, 23);
+            TxtLat.TabIndex = 22;
+            TxtLat.Text = "0";
+            // 
+            // IsGeoMode
+            // 
+            IsGeoMode.AutoSize = true;
+            IsGeoMode.Location = new Point(12, 418);
+            IsGeoMode.Name = "IsGeoMode";
+            IsGeoMode.Size = new Size(150, 19);
+            IsGeoMode.TabIndex = 24;
+            IsGeoMode.Text = "Использовать ячейки?";
+            IsGeoMode.UseVisualStyleBackColor = true;
+            // 
+            // TxtNmeaPath
+            // 
+            TxtNmeaPath.Location = new Point(12, 474);
+            TxtNmeaPath.Name = "TxtNmeaPath";
+            TxtNmeaPath.Size = new Size(110, 23);
+            TxtNmeaPath.TabIndex = 25;
+            // 
+            // LblNmeaPath
+            // 
+            LblNmeaPath.AutoSize = true;
+            LblNmeaPath.Location = new Point(12, 456);
+            LblNmeaPath.Name = "LblNmeaPath";
+            LblNmeaPath.Size = new Size(191, 15);
+            LblNmeaPath.TabIndex = 26;
+            LblNmeaPath.Text = "Путь до файла радиовысотомера";
+            // 
+            // LblLatBounds
+            // 
+            LblLatBounds.AutoSize = true;
+            LblLatBounds.Location = new Point(12, 269);
+            LblLatBounds.Name = "LblLatBounds";
+            LblLatBounds.Size = new Size(168, 15);
+            LblLatBounds.TabIndex = 27;
+            LblLatBounds.Text = "Стартовая позиция (Долгота)";
+            // 
+            // LblLonBounds
+            // 
+            LblLonBounds.AutoSize = true;
+            LblLonBounds.Location = new Point(12, 322);
+            LblLonBounds.Name = "LblLonBounds";
+            LblLonBounds.Size = new Size(168, 15);
+            LblLonBounds.TabIndex = 28;
+            LblLonBounds.Text = "Стартовая позиция (Долгота)";
+            // 
+            // BtnSelectNmea
+            // 
+            BtnSelectNmea.Location = new Point(128, 473);
+            BtnSelectNmea.Name = "BtnSelectNmea";
+            BtnSelectNmea.Size = new Size(75, 23);
+            BtnSelectNmea.TabIndex = 29;
+            BtnSelectNmea.Text = "Выбрать";
+            BtnSelectNmea.UseVisualStyleBackColor = true;
+            // 
+            // ChkUseExternalNmea
+            // 
+            ChkUseExternalNmea.AutoSize = true;
+            ChkUseExternalNmea.Location = new Point(14, 503);
+            ChkUseExternalNmea.Name = "ChkUseExternalNmea";
+            ChkUseExternalNmea.Size = new Size(207, 19);
+            ChkUseExternalNmea.TabIndex = 30;
+            ChkUseExternalNmea.Text = "Использовать файл с замерами?";
+            ChkUseExternalNmea.UseVisualStyleBackColor = true;
+            // 
             // FrmDrone
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(197, 527);
+            ClientSize = new Size(333, 673);
+            Controls.Add(ChkUseExternalNmea);
+            Controls.Add(BtnSelectNmea);
+            Controls.Add(LblLonBounds);
+            Controls.Add(LblLatBounds);
+            Controls.Add(LblNmeaPath);
+            Controls.Add(TxtNmeaPath);
+            Controls.Add(IsGeoMode);
+            Controls.Add(TxtLat);
+            Controls.Add(TxtLon);
             Controls.Add(LblColumnBounds);
             Controls.Add(TxtColumn);
             Controls.Add(BtnCancel);
@@ -219,7 +316,7 @@
             Controls.Add(label4);
             Controls.Add(label3);
             Controls.Add(label2);
-            Controls.Add(label1);
+            Controls.Add(LblNoise);
             Controls.Add(TxtFrequency);
             Controls.Add(TxtRow);
             Controls.Add(TxtHeading);
@@ -244,7 +341,7 @@
         private TextBox TxtHeading;
         private TextBox TxtRow;
         private TextBox TxtFrequency;
-        private Label label1;
+        private Label LblNoise;
         private Label label2;
         private Label label3;
         private Label label4;
@@ -255,5 +352,14 @@
         private Button BtnCancel;
         private Label LblColumnBounds;
         private TextBox TxtColumn;
+        private TextBox TxtLon;
+        private TextBox TxtLat;
+        private CheckBox IsGeoMode;
+        private TextBox TxtNmeaPath;
+        private Label LblNmeaPath;
+        private Label LblLatBounds;
+        private Label LblLonBounds;
+        private Button BtnSelectNmea;
+        private CheckBox ChkUseExternalNmea;
     }
 }

@@ -68,5 +68,47 @@ namespace TerrainScanner.Core.Generators
 
             return null; // Возвращаем null, если данные отсутствуют (NoData) или некорректны
         }
+
+        /// <summary>
+        /// Читает значения радиовысоты из NMEA-файла.
+        /// Каждая строка файла должна содержать одно NMEA-предложение (например, $GPGGA).
+        /// </summary>
+        /// <param name="filePath">Путь к NMEA-файлу.</param>
+        /// <returns>Список распарсенных значений радиовысоты (в метрах).
+        /// Пропуски (null) сохраняются для синхронизации с точками трека.</returns>
+        public static List<float?> ReadRadarAltitudesFromFile(string filePath)
+        {
+            var altitudes = new List<float?>();
+
+            foreach (var line in File.ReadLines(filePath))
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                // Поддерживаем как полные NMEA-строки, так и просто числа (значения высот)
+                var trimmed = line.Trim();
+
+                if (trimmed.StartsWith('$'))
+                {
+                    // Полная NMEA-строка — парсим как GGA
+                    var parsed = ParseRadarAltitude(trimmed);
+                    altitudes.Add(parsed);
+                }
+                else if (float.TryParse(trimmed, System.Globalization.NumberStyles.Float,
+                                        System.Globalization.CultureInfo.InvariantCulture, out float value))
+                {
+                    // Просто число — считаем, что это уже значение высоты
+                    altitudes.Add(value);
+                }
+                else
+                {
+                    altitudes.Add(null);
+                }
+            }
+
+            return altitudes;
+        }
     }
 }

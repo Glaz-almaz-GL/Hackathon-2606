@@ -2,6 +2,7 @@ using System.Numerics;
 using TerrainScanner.Core;
 using TerrainScanner.Core.Generators;
 using TerrainScanner.Core.Models;
+using TerrainScanner.Core.Models.Models;
 using TerrainScanner.Core.Models.Terrain;
 using TerrainScanner.Core.Services;
 using TerrainScanner.Core.Simulators;
@@ -186,8 +187,14 @@ namespace TerrainScanner.WinForms
                 return;
             }
 
-            // Передаём размеры карты в диалог для валидации
-            using FrmDrone frmDroneParams = new(_map.Rows, _map.Columns);
+            // Передаём в диалог размеры карты И географические границы
+            using FrmDrone frmDroneParams = new(
+                _map.Rows,
+                _map.Columns,
+                _map.MinLatitude,
+                _map.MaxLatitude,
+                _map.MinLongitude,
+                _map.MaxLongitude);
 
             // 1. Получаем параметры от пользователя
             if (frmDroneParams.ShowDialog(this) != DialogResult.OK)
@@ -196,13 +203,23 @@ namespace TerrainScanner.WinForms
                 return;
             }
 
-            // 2. Преобразуем индексы ячейки в географические координаты
-            double startLat = _map.GetLatitude(frmDroneParams.Row);
-            double startLon = _map.GetLongitude(frmDroneParams.Column);
+            // 2. Определяем стартовые координаты в зависимости от режима
+            double startLat, startLon;
 
-            LogService.Log(
-                $"Стартовая ячейка [{frmDroneParams.Row}, {frmDroneParams.Column}] -> " +
-                $"координаты ({startLat:F6}, {startLon:F6})");
+            if (frmDroneParams.UseCellCoordinates)
+            {
+                startLat = _map.GetLatitude(frmDroneParams.Row);
+                startLon = _map.GetLongitude(frmDroneParams.Column);
+                LogService.Log(
+                    $"Стартовая ячейка [{frmDroneParams.Row}, {frmDroneParams.Column}] -> " +
+                    $"координаты ({startLat:F6}, {startLon:F6})");
+            }
+            else
+            {
+                startLat = frmDroneParams.Latitude;
+                startLon = frmDroneParams.Longitude;
+                LogService.Log($"Стартовые геокоординаты: ({startLat:F6}, {startLon:F6})");
+            }
 
             // 3. Создаем дрона
             var drone = new Drone
@@ -222,12 +239,11 @@ namespace TerrainScanner.WinForms
                 $"=== Запуск симуляции полёта дрона ===\n" +
                 $"  H={frmDroneParams.DroneHeight}м, Heading={frmDroneParams.Heading}°, " +
                 $"Speed={frmDroneParams.Speed}м/с\n" +
-                $"  StartCell=[{frmDroneParams.Row}, {frmDroneParams.Column}], " +
-                $"Duration={frmDroneParams.Duration}с\n" +
-                $"  Freq={frmDroneParams.Frequency}Гц, Noise={frmDroneParams.Noise}м");
+                $"  Start=({startLat:F6}, {startLon:F6}), Duration={frmDroneParams.Duration}с\n" +
+                $"  Freq={frmDroneParams.Frequency}Гц");
 
             // 4. Симулируем полет
-            double updateIntervalSeconds = frmDroneParams.Frequency / 10;
+            double updateIntervalSeconds = 1.0 / frmDroneParams.Frequency;
             var simulator = new DroneFlightSimulator(
                 drone,
                 _map,
@@ -261,36 +277,77 @@ namespace TerrainScanner.WinForms
                 .Select(p => new Vector2(p.Distance, p.TerrainHeight))
                 .ToList();
 
-            // 7. Генерируем NMEA-данные и восстанавливаем высоту рельефа
+            // 7. Получаем данные высотомера: из файла ИЛИ генерируем
             List<Vector2> measuredPath = [];
             List<string> generatedStrings = [];
 
-            foreach (var point in truePath)
+            if (!string.IsNullOrWhiteSpace(frmDroneParams.NmeaFilePath))
             {
-                string nmeaResult = _nmeaGenerator.Generate(
-                    frmDroneParams.DroneHeight,
-                    point.Y,
-                    0,
-                    frmDroneParams.Noise);
+                // === РЕЖИМ: Чтение данных из внешнего NMEA-файла ===
+                LogService.Log($"Чтение данных высотомера из файла: {frmDroneParams.NmeaFilePath}");
 
-                var parsedRadarAlt = NmeaGenerator.ParseRadarAltitude(nmeaResult);
+                var fileAltitudes = NmeaGenerator.ReadRadarAltitudesFromFile(frmDroneParams.NmeaFilePath);
+                LogService.Log($"Прочитано значений из файла: {fileAltitudes.Count}");
 
-                if (!parsedRadarAlt.HasValue)
+                int countToProcess = Math.Min(truePath.Count, fileAltitudes.Count);
+                if (truePath.Count != fileAltitudes.Count)
                 {
-                    LogService.Log($"Предупреждение: Parsed Height from radar is null at X={point.X:F2}");
-                    continue;
+                    LogService.Log(
+                        $"ПРЕДУПРЕЖДЕНИЕ: Количество точек трека ({truePath.Count}) и " +
+                        $"значений в файле ({fileAltitudes.Count}) не совпадает. " +
+                        $"Будет обработано {countToProcess} точек.");
                 }
 
-                generatedStrings.Add(nmeaResult);
+                for (int i = 0; i < countToProcess; i++)
+                {
+                    var point = truePath[i];
+                    var parsedRadarAlt = fileAltitudes[i];
 
-                // Восстанавливаем высоту рельефа: Terrain = Drone_Alt - Radar_Alt
-                double restoredTerrainHeight = frmDroneParams.DroneHeight - parsedRadarAlt.Value;
-                measuredPath.Add(new Vector2(point.X, (float)restoredTerrainHeight));
+                    if (!parsedRadarAlt.HasValue)
+                    {
+                        LogService.Log($"Предупреждение: NMEA-строка #{i} не содержит валидной высоты");
+                        continue;
+                    }
+
+                    generatedStrings.Add($"[Файл] #{i}: {parsedRadarAlt.Value:F1}м");
+
+                    // Восстанавливаем высоту рельефа: Terrain = Drone_Alt - Radar_Alt
+                    double restoredTerrainHeight = frmDroneParams.DroneHeight - parsedRadarAlt.Value;
+                    measuredPath.Add(new Vector2(point.X, (float)restoredTerrainHeight));
+                }
+            }
+            else
+            {
+                // === РЕЖИМ: Генерация NMEA-данных симулятором ===
+                LogService.Log($"Генерация NMEA-данных (шум: ±{frmDroneParams.Noise}м)");
+
+                foreach (var point in truePath)
+                {
+                    string nmeaResult = _nmeaGenerator.Generate(
+                        frmDroneParams.DroneHeight,
+                        point.Y,
+                        0,
+                        frmDroneParams.Noise);
+
+                    var parsedRadarAlt = NmeaGenerator.ParseRadarAltitude(nmeaResult);
+
+                    if (!parsedRadarAlt.HasValue)
+                    {
+                        LogService.Log($"Предупреждение: Parsed Height from radar is null at X={point.X:F2}");
+                        continue;
+                    }
+
+                    generatedStrings.Add(nmeaResult);
+
+                    // Восстанавливаем высоту рельефа: Terrain = Drone_Alt - Radar_Alt
+                    double restoredTerrainHeight = frmDroneParams.DroneHeight - parsedRadarAlt.Value;
+                    measuredPath.Add(new Vector2(point.X, (float)restoredTerrainHeight));
+                }
             }
 
             if (measuredPath.Count == 0)
             {
-                LogService.Log("ОШИБКА: Не удалось восстановить ни одной точки из NMEA");
+                LogService.Log("ОШИБКА: Не удалось получить ни одной точки измерений");
                 return;
             }
 
@@ -324,6 +381,7 @@ namespace TerrainScanner.WinForms
 
             LogService.Log(
                 $"=== Симуляция завершена ===\n" +
+                $"  Источник данных: {(!string.IsNullOrWhiteSpace(frmDroneParams.NmeaFilePath) ? "Внешний файл" : "Симулятор")}\n" +
                 $"  Точек трека: {droneTrack.Count}\n" +
                 $"  Точек измерений: {measuredPath.Count}\n" +
                 $"  Pearson: {correlationResult.PearsonCorrelation:F4}\n" +
